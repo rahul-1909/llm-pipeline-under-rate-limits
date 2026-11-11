@@ -4,3 +4,4 @@ __pycache__/
 *.pyc
 papers/
 *.zip
+.streamlit/secrets.toml
