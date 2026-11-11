@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rate-Limited RAG: Interactive Benchmark Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col">
+
+  <!-- Header -->
+  <header class="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-50 shadow-md">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <span class="p-2 bg-indigo-600 rounded-lg text-white font-bold text-lg"><i class="fa-solid fa-bolt"></i></span>
+        <div>
+          <h1 class="text-lg font-bold tracking-tight">Rate-Limited RAG Pipeline Dashboard</h1>
+          <p class="text-xs text-slate-400">Llama 3.1 8B Instant Benchmarks & Stand-in Simulation</p>
+        </div>
+      </div>
+      <div class="flex items-center space-x-3">
+        <a href="https://github.com/rahul-1909/llm-pipeline-under-rate-limits" target="_blank" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-md border border-slate-700 transition flex items-center space-x-1.5">
+          <i class="fa-brands fa-github"></i>
+          <span>View GitHub</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full space-y-8">
+
+    <!-- KPI Summary Row -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center space-x-4">
+        <div class="p-3 bg-blue-50 text-blue-600 rounded-lg text-xl"><i class="fa-solid fa-gauge-high"></i></div>
+        <div>
+          <div class="text-xs font-medium text-slate-500 uppercase tracking-wider">Per-Minute Ceiling</div>
+          <div class="text-xl font-bold text-slate-900 mt-0.5">8,000 TPM <span class="text-xs font-normal text-slate-400">/ 1k OTPM</span></div>
+          <div class="text-xs text-blue-600 font-medium mt-0.5">Median 429 recovery: 6.0s</div>
+        </div>
+      </div>
+
+      <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center space-x-4">
+        <div class="p-3 bg-amber-50 text-amber-600 rounded-lg text-xl"><i class="fa-solid fa-bucket"></i></div>
+        <div>
+          <div class="text-xs font-medium text-slate-500 uppercase tracking-wider">Daily Token Quota</div>
+          <div class="text-xl font-bold text-slate-900 mt-0.5">200,000 TPD</div>
+          <div class="text-xs text-amber-600 font-medium mt-0.5">Rolling refill: ~2.3 tokens/s</div>
+        </div>
+      </div>
+
+      <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center space-x-4">
+        <div class="p-3 bg-emerald-50 text-emerald-600 rounded-lg text-xl"><i class="fa-solid fa-stopwatch"></i></div>
+        <div>
+          <div class="text-xs font-medium text-slate-500 uppercase tracking-wider">True Model TTFT</div>
+          <div class="text-xl font-bold text-slate-900 mt-0.5">438 ms <span class="text-xs font-normal text-slate-400">(p50)</span></div>
+          <div class="text-xs text-emerald-600 font-medium mt-0.5">12.7s was silent SDK retries</div>
+        </div>
+      </div>
+
+      <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center space-x-4">
+        <div class="p-3 bg-indigo-50 text-indigo-600 rounded-lg text-xl"><i class="fa-solid fa-check-double"></i></div>
+        <div>
+          <div class="text-xs font-medium text-slate-500 uppercase tracking-wider">Setting 1 Cost Efficiency</div>
+          <div class="text-xl font-bold text-slate-900 mt-0.5">40.1% <span class="text-xs font-normal text-slate-400">token cost</span></div>
+          <div class="text-xs text-indigo-600 font-medium mt-0.5">100% accuracy matches Setting 2</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="border-b border-slate-200 flex space-x-6">
+      <button onclick="switchTab('charts')" id="tab-btn-charts" class="pb-3 px-1 border-b-2 border-indigo-600 font-semibold text-sm text-indigo-600 flex items-center space-x-2">
+        <i class="fa-solid fa-chart-simple"></i>
+        <span>Benchmark Analytics</span>
+      </button>
+      <button onclick="switchTab('simulator')" id="tab-btn-simulator" class="pb-3 px-1 border-b-2 border-transparent font-medium text-sm text-slate-500 hover:text-slate-800 flex items-center space-x-2">
+        <i class="fa-solid fa-sliders"></i>
+        <span>Token Bucket Simulator</span>
+      </button>
+      <button onclick="switchTab('tables')" id="tab-btn-tables" class="pb-3 px-1 border-b-2 border-transparent font-medium text-sm text-slate-500 hover:text-slate-800 flex items-center space-x-2">
+        <i class="fa-solid fa-table-list"></i>
+        <span>Audited Results Explorer</span>
+      </button>
+    </div>
+
+    <!-- TAB 1: CHARTS -->
+    <div id="tab-charts" class="space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Latency Chart -->
+        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h2 class="text-base font-bold text-slate-900">First-Token vs Total Latency Across Scenarios</h2>
+              <p class="text-xs text-slate-500">Median (p50) duration in milliseconds from Table 2a</p>
+            </div>
+            <span class="text-xs bg-slate-100 text-slate-600 font-medium px-2.5 py-1 rounded">p50 Latencies</span>
+          </div>
+          <div class="h-64">
+            <canvas id="latencyChart"></canvas>
+          </div>
+          <p class="text-xs text-slate-500 mt-3 italic">* Burst and sustained overload show fast p50 (~35 ms) because rejected requests fail fast at queue saturation without prefill delay.</p>
+        </div>
+
+        <!-- Cost vs Accuracy Chart -->
+        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h2 class="text-base font-bold text-slate-900">Retrieval Settings: Cost vs Accuracy</h2>
+              <p class="text-xs text-slate-500">Input tokens consumed vs ground-truth accuracy (Common n=15)</p>
+            </div>
+            <span class="text-xs bg-emerald-50 text-emerald-700 font-medium px-2.5 py-1 rounded">Cost Optimization</span>
+          </div>
+          <div class="h-64">
+            <canvas id="retrievalChart"></canvas>
+          </div>
+          <p class="text-xs text-slate-500 mt-3 italic">Setting 1 (200w chunks, k=3) achieves 100% correct answers using only 1,061 tokens vs 2,642 in Setting 2.</p>
+        </div>
+      </div>
+
+      <!-- Jitter Storm Comparison -->
+      <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+        <h2 class="text-base font-bold text-slate-900 mb-1">Retry Policy & Jitter Storm Analysis</h2>
+        <p class="text-xs text-slate-500 mb-4">Outcome of retrying requests after HTTP 429 rate limits (Section 6)</p>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="border border-slate-200 rounded-lg p-4 bg-slate-50">
+            <div class="text-xs font-semibold text-slate-500 uppercase">Unjittered Backoff</div>
+            <div class="text-lg font-bold text-slate-900 mt-1">6 of 12 Succeeded</div>
+            <div class="text-xs text-slate-600 mt-0.5">50% retry collision rate at 6.0s</div>
+            <div class="w-full bg-slate-200 h-2 rounded-full mt-3 overflow-hidden">
+              <div class="bg-emerald-500 h-2 rounded-full" style="width: 50%"></div>
+            </div>
+          </div>
+
+          <div class="border border-slate-200 rounded-lg p-4 bg-slate-50">
+            <div class="text-xs font-semibold text-slate-500 uppercase">Jittered Backoff (0.1–1.5s)</div>
+            <div class="text-lg font-bold text-slate-900 mt-1">4 of 12 Succeeded</div>
+            <div class="text-xs text-slate-600 mt-0.5">66.7% retry collision rate (worse)</div>
+            <div class="w-full bg-slate-200 h-2 rounded-full mt-3 overflow-hidden">
+              <div class="bg-amber-500 h-2 rounded-full" style="width: 33.3%"></div>
+            </div>
+          </div>
+
+          <div class="border border-slate-200 rounded-lg p-4 bg-slate-50">
+            <div class="text-xs font-semibold text-slate-500 uppercase">Steady Real (3.1 req/min)</div>
+            <div class="text-lg font-bold text-slate-900 mt-1">0 of 13 Succeeded</div>
+            <div class="text-xs text-red-600 font-semibold mt-0.5">100% collision rate (over-capacity)</div>
+            <div class="w-full bg-slate-200 h-2 rounded-full mt-3 overflow-hidden">
+              <div class="bg-red-500 h-2 rounded-full" style="width: 0%"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: TOKEN BUCKET SIMULATOR -->
+    <div id="tab-simulator" class="hidden space-y-6">
+      <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+        <h2 class="text-base font-bold text-slate-900 mb-1">Interactive Leaky-Bucket Refill Simulator</h2>
+        <p class="text-xs text-slate-500 mb-6">Explore how traffic arrival rates deplete token capacity and how the rolling 2.3 tokens/s refill recovers the bucket.</p>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div class="space-y-5">
+            <div>
+              <label class="text-xs font-semibold text-slate-700 flex justify-between">
+                <span>Offered Request Rate (req / min):</span>
+                <span id="rateVal" class="text-indigo-600 font-bold">4.0</span>
+              </label>
+              <input type="range" id="rateSlider" min="0.5" max="15.0" step="0.5" value="4.0" class="w-full mt-2 accent-indigo-600" oninput="updateSim()">
+            </div>
+
+            <div>
+              <label class="text-xs font-semibold text-slate-700 flex justify-between">
+                <span>Tokens per Request (In + Out):</span>
+                <span id="tokensVal" class="text-indigo-600 font-bold">2,600</span>
+              </label>
+              <input type="range" id="tokensSlider" min="500" max="8000" step="100" value="2600" class="w-full mt-2 accent-indigo-600" oninput="updateSim()">
+            </div>
+
+            <div class="p-4 bg-slate-50 rounded-lg border border-slate-200 space-y-2 text-xs">
+              <div class="flex justify-between text-slate-600">
+                <span>Demand Rate:</span>
+                <span id="simDemand" class="font-bold text-slate-900">10,400 tokens / min</span>
+              </div>
+              <div class="flex justify-between text-slate-600">
+                <span>TPM Capacity Ceiling:</span>
+                <span class="font-bold text-slate-900">8,000 tokens / min</span>
+              </div>
+              <div class="flex justify-between text-slate-600">
+                <span>Net Token Balance Trend:</span>
+                <span id="simStatus" class="font-bold text-red-600">Deficit: Rate-Limits Imminent</span>
+              </div>
+              <div class="flex justify-between text-slate-600">
+                <span>Estimated Time to First 429:</span>
+                <span id="simTime429" class="font-bold text-amber-600">~46 seconds</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex flex-col justify-center items-center p-6 bg-slate-50 rounded-xl border border-slate-200">
+            <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Simulated Bucket Status</div>
+            <div id="simMeter" class="text-3xl font-extrabold text-red-600 mb-1">OVERLOADED</div>
+            <div id="simAdvice" class="text-xs text-slate-600 text-center max-w-sm mt-2">
+              Demand exceeds capacity. Requests will encounter HTTP 429 after initial burst tokens are consumed. Queueing with dynamic backoff is mandatory.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: TABLES EXPLORER -->
+    <div id="tab-tables" class="hidden space-y-6">
+      <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+          <div>
+            <h2 class="text-base font-bold text-slate-900">Benchmark Telemetry (Table 2a & 2b)</h2>
+            <p class="text-xs text-slate-500">Summary metrics across all evaluated scenarios</p>
+          </div>
+          <input type="text" id="tableSearch" placeholder="Search scenarios..." onkeyup="filterTable()" class="text-xs border border-slate-300 rounded-lg px-3 py-2 w-64 focus:outline-none focus:border-indigo-600">
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs text-left" id="summaryTable">
+            <thead class="bg-slate-100 text-slate-700 font-semibold uppercase tracking-wider border-b border-slate-200">
+              <tr>
+                <th class="py-3 px-3">Scenario</th>
+                <th class="py-3 px-3">Offered Rate</th>
+                <th class="py-3 px-3">Sent / OK / 429</th>
+                <th class="py-3 px-3">TTFT p50 (ms)</th>
+                <th class="py-3 px-3">Total p50 (ms)</th>
+                <th class="py-3 px-3">Tokens / Req</th>
+                <th class="py-3 px-3">Retries / Req</th>
+                <th class="py-3 px-3">Status</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-200 text-slate-700" id="tableBody">
+              <tr class="hover:bg-slate-50">
+                <td class="py-3 px-3 font-semibold text-slate-900">steady</td>
+                <td class="py-3 px-3">2.5 req/min</td>
+                <td class="py-3 px-3">12 / 12 / 0</td>
+                <td class="py-3 px-3">204.6</td>
+                <td class="py-3 px-3">1133.0</td>
+                <td class="py-3 px-3">2,631</td>
+                <td class="py-3 px-3">0.0</td>
+                <td class="py-3 px-3"><span class="px-2 py-0.5 rounded text-emerald-800 bg-emerald-100 font-medium">100% OK</span></td>
+              </tr>
+              <tr class="hover:bg-slate-50">
+                <td class="py-3 px-3 font-semibold text-slate-900">burst</td>
+                <td class="py-3 px-3">burst of 20</td>
+                <td class="py-3 px-3">20 / 6 / 14</td>
+                <td class="py-3 px-3">34.5*</td>
+                <td class="py-3 px-3">35.1*</td>
+                <td class="py-3 px-3">2,635</td>
+                <td class="py-3 px-3">0.6</td>
+                <td class="py-3 px-3"><span class="px-2 py-0.5 rounded text-amber-800 bg-amber-100 font-medium">30% OK, 70% 429</span></td>
+              </tr>
+              <tr class="hover:bg-slate-50">
+                <td class="py-3 px-3 font-semibold text-slate-900">sustained_overload</td>
+                <td class="py-3 px-3">10.8 req/min</td>
+                <td class="py-3 px-3">33 / 11 / 22</td>
+                <td class="py-3 px-3">35.0*</td>
+                <td class="py-3 px-3">35.1*</td>
+                <td class="py-3 px-3">2,636</td>
+                <td class="py-3 px-3">0.5</td>
+                <td class="py-3 px-3"><span class="px-2 py-0.5 rounded text-amber-800 bg-amber-100 font-medium">33% OK, 67% 429</span></td>
+              </tr>
+              <tr class="hover:bg-slate-50">
+                <td class="py-3 px-3 font-semibold text-slate-900">limit_halved</td>
+                <td class="py-3 px-3">2.5 req/min</td>
+                <td class="py-3 px-3">12 / 12 / 0</td>
+                <td class="py-3 px-3">205.1</td>
+                <td class="py-3 px-3">1131.0</td>
+                <td class="py-3 px-3">2,631</td>
+                <td class="py-3 px-3">0.0</td>
+                <td class="py-3 px-3"><span class="px-2 py-0.5 rounded text-emerald-800 bg-emerald-100 font-medium">100% OK</span></td>
+              </tr>
+              <tr class="hover:bg-slate-50">
+                <td class="py-3 px-3 font-semibold text-slate-900">daily_budget_exhausted</td>
+                <td class="py-3 px-3">10 at once</td>
+                <td class="py-3 px-3">10 / 0 / 10</td>
+                <td class="py-3 px-3">n/a</td>
+                <td class="py-3 px-3">n/a</td>
+                <td class="py-3 px-3">0</td>
+                <td class="py-3 px-3">0.0</td>
+                <td class="py-3 px-3"><span class="px-2 py-0.5 rounded text-indigo-800 bg-indigo-100 font-medium">100% Graceful</span></td>
+              </tr>
+              <tr class="hover:bg-slate-50">
+                <td class="py-3 px-3 font-semibold text-slate-900">steady_real (Groq)</td>
+                <td class="py-3 px-3">3.1 req/min</td>
+                <td class="py-3 px-3">20 / 7 / 13</td>
+                <td class="py-3 px-3">438.0</td>
+                <td class="py-3 px-3">1109.0</td>
+                <td class="py-3 px-3">2,642</td>
+                <td class="py-3 px-3">0.7</td>
+                <td class="py-3 px-3"><span class="px-2 py-0.5 rounded text-red-800 bg-red-100 font-medium">35% OK, 65% 429</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500">
+    Rate-Limited RAG Benchmark System &bull; Stand-in Server &bull; Open-Source Architecture
+  </footer>
+
+  <script>
+    function switchTab(tab) {
+      document.getElementById('tab-charts').classList.add('hidden');
+      document.getElementById('tab-simulator').classList.add('hidden');
+      document.getElementById('tab-tables').classList.add('hidden');
+
+      document.getElementById('tab-btn-charts').className = "pb-3 px-1 border-b-2 border-transparent font-medium text-sm text-slate-500 hover:text-slate-800 flex items-center space-x-2";
+      document.getElementById('tab-btn-simulator').className = "pb-3 px-1 border-b-2 border-transparent font-medium text-sm text-slate-500 hover:text-slate-800 flex items-center space-x-2";
+      document.getElementById('tab-btn-tables').className = "pb-3 px-1 border-b-2 border-transparent font-medium text-sm text-slate-500 hover:text-slate-800 flex items-center space-x-2";
+
+      document.getElementById('tab-' + tab).classList.remove('hidden');
+      document.getElementById('tab-btn-' + tab).className = "pb-3 px-1 border-b-2 border-indigo-600 font-semibold text-sm text-indigo-600 flex items-center space-x-2";
+    }
+
+    // Initialize Charts
+    window.onload = function() {
+      // Latency Chart
+      const ctxLat = document.getElementById('latencyChart').getContext('2d');
+      new Chart(ctxLat, {
+        type: 'bar',
+        data: {
+          labels: ['steady', 'burst', 'overload', 'limit_halved', 'steady_real'],
+          datasets: [
+            {
+              label: 'First-Token p50 (ms)',
+              data: [204.6, 34.5, 35.0, 205.1, 438.0],
+              backgroundColor: 'rgba(59, 130, 246, 0.85)'
+            },
+            {
+              label: 'Total Time p50 (ms)',
+              data: [1133.0, 35.1, 35.1, 1131.0, 1109.0],
+              backgroundColor: 'rgba(16, 185, 129, 0.85)'
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: { y: { beginAtZero: true } }
+        }
+      });
+
+      // Retrieval Chart
+      const ctxRet = document.getElementById('retrievalChart').getContext('2d');
+      new Chart(ctxRet, {
+        type: 'bar',
+        data: {
+          labels: ['Setting 1 (Small)', 'Setting 2 (Medium)', 'Setting 3 (Large)'],
+          datasets: [
+            {
+              label: 'Input Tokens / Request',
+              data: [1061, 2642, 6393],
+              backgroundColor: ['#10b981', '#3b82f6', '#ef4444'],
+              yAxisID: 'y'
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: { beginAtZero: true, title: { display: true, text: 'Tokens per Request' } }
+          }
+        }
+      });
+    };
+
+    function updateSim() {
+      const rate = parseFloat(document.getElementById('rateSlider').value);
+      const tokens = parseInt(document.getElementById('tokensSlider').value);
+      document.getElementById('rateVal').innerText = rate.toFixed(1);
+      document.getElementById('tokensVal').innerText = tokens.toLocaleString();
+
+      const demand = rate * tokens;
+      document.getElementById('simDemand').innerText = Math.round(demand).toLocaleString() + " tokens / min";
+
+      const meter = document.getElementById('simMeter');
+      const status = document.getElementById('simStatus');
+      const advice = document.getElementById('simAdvice');
+      const time429 = document.getElementById('simTime429');
+
+      if (demand <= 8000) {
+        meter.innerText = "HEALTHY";
+        meter.className = "text-3xl font-extrabold text-emerald-600 mb-1";
+        status.innerText = "Surplus: Within 8k TPM Limit";
+        status.className = "font-bold text-emerald-600";
+        time429.innerText = "Never (Sustainable)";
+        time429.className = "font-bold text-emerald-600";
+        advice.innerText = "Offered rate is safely within the 8,000 TPM limit. Requests process with zero rate-limit backoff.";
+      } else {
+        meter.innerText = "OVERLOADED";
+        meter.className = "text-3xl font-extrabold text-red-600 mb-1";
+        status.innerText = "Deficit: Rate-Limits Imminent";
+        status.className = "font-bold text-red-600";
+        const excess = demand - 8000;
+        const s = Math.max(5, Math.round((8000 / demand) * 60));
+        time429.innerText = "~" + s + " seconds";
+        time429.className = "font-bold text-amber-600";
+        advice.innerText = "Demand exceeds 8,000 TPM. Initial token burst will drain, triggering 429 errors. Dynamic retry pacing is required.";
+      }
+    }
+
+    function filterTable() {
+      const q = document.getElementById('tableSearch').value.toLowerCase();
+      const rows = document.getElementById('tableBody').getElementsByTagName('tr');
+      for (let r of rows) {
+        r.style.display = r.innerText.toLowerCase().includes(q) ? '' : 'none';
+      }
+    }
+  </script>
+</body>
+</html>
