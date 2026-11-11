@@ -1,0 +1,23 @@
+{
+  "server_model_ttft_p50_ms": 438.1,
+  "server_model_ttft_p95_ms": 1439.8,
+  "server_model_ttft_p99_ms": 1439.8,
+  "server_total_p50_ms": 1384.2,
+  "server_total_p95_ms": 7454.4,
+  "pipeline_user_ttft_p50_ms": 968.1,
+  "pipeline_user_ttft_p95_ms": 7348.4,
+  "avg_tokens_in": 2078.0,
+  "avg_tokens_out": 103.8,
+  "raw_model_p50_ms": 262.5,
+  "raw_model_p95_ms": 742.6,
+  "raw_model_p99_ms": 1618.3,
+  "rate_limit_rejection_ms": 61.9,
+  "retry_after_mean_s": 5.2,
+  "limits": {
+    "otpm_limit": 1000,
+    "tpm_limit": 8000,
+    "rpd_limit": 1000,
+    "refill_rate_s_per_req": 86.4
+  },
+  "concurrency_slowdown_factor": 1.25
+}
